@@ -2,36 +2,28 @@
 
 A simple Node.js CLI tool to automatically bump the minor version of a Flutter/Dart `pubspec.yaml` file.
 
-## Installation
+## 🚀 Zero-Touch Installation
 
-You can install this directly from GitHub as a dev dependency in your project:
+Install this as a dev dependency, and it will **automatically** add the `bump-version` script to your `package.json`:
 
 ```bash
 npm install -D github:dwaipayanray95/bump-version
 ```
 
-## Quick Start (No Setup Required)
-
-The easiest way to use this is to run it once via `npx`. It will **automatically** configure your project by adding the `bump-version` script to your `package.json`.
-
-```bash
-npx github:dwaipayanray95/bump-version
-```
-
-After running this once, you can simply use:
+That's it! You can now immediately run:
 ```bash
 npm run bump-version
 ```
 
-## Alternative: Installation
+---
 
-If you prefer to install it as a dev dependency:
+## ⚡ Quick Run (No Installation)
+
+If you don't want to install it permanently, you can run it once via `npx`. It will still offer to configure your project for you:
 
 ```bash
-npm install -D github:dwaipayanray95/bump-version
+npx github:dwaipayanray95/bump-version
 ```
-
-The first time you run it, it will still offer to add the shortcut to your `package.json` for you.
 
 ## How it works
 The script searches for the `version:` line in `pubspec.yaml` (formatted as `major.minor.patch+build`) and increments the **minor** version by 1.
