@@ -193,12 +193,7 @@ async function run() {
 
   // Validate the bump type; if invalid or missing, enter Interactive Mode
   if (bumpType && ['major', 'minor', 'patch'].includes(bumpType)) {
-    try {
-      await performBump(platform, bumpType);
-    } catch (err) {
-      console.error(`\n${colors.red}❌ Error: ${err.message}${colors.reset}`);
-      process.exit(1);
-    }
+    // Valid bumpType found, proceed to final execution block below
   } else {
     // Interactive Mode
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
