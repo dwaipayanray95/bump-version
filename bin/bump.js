@@ -261,8 +261,14 @@ async function selectMenu(platform) {
     if (!firstRender) readline.moveCursor(process.stdout, 0, -linesToMoveUp);
     firstRender = false;
     process.stdout.write('\x1B[?25l');
+    // Load tool version dynamically
+    let toolVersion = '';
+    try {
+      toolVersion = ' v' + JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
+    } catch (e) {}
+
     readline.clearLine(process.stdout, 0);
-    process.stdout.write(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}\n`);
+    process.stdout.write(`\n${colors.bright}bump version${colors.reset}${colors.dim}${toolVersion}${colors.reset}\n`);
     readline.clearLine(process.stdout, 0);
     process.stdout.write(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}\n\n`);
     options.forEach((opt, i) => {
