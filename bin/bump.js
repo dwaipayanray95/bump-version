@@ -4,7 +4,27 @@ const fs = require('fs');
 const path = require('path');
 
 // Target the pubspec.yaml in the current working directory of the user
-const pubspecPath = path.resolve(process.cwd(), 'pubspec.yaml');
+const cwd = process.cwd();
+const pubspecPath = path.resolve(cwd, 'pubspec.yaml');
+const packageJsonPath = path.resolve(cwd, 'package.json');
+
+// --- AUTO-CONFIGURATION LOGIC ---
+if (fs.existsSync(packageJsonPath)) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    pkg.scripts = pkg.scripts || {};
+    
+    // Check if the script already exists under common names
+    if (!pkg.scripts['bump-version'] && !pkg.scripts['bump']) {
+      pkg.scripts['bump-version'] = 'bump-version';
+      fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
+      console.log('✅ Added "bump-version" script to your package.json');
+    }
+  } catch (err) {
+    // Silently fail on package.json issues to avoid blocking the main task
+  }
+}
+// --------------------------------
 
 if (!fs.existsSync(pubspecPath)) {
   console.error(`ERROR: Could not find pubspec.yaml at ${pubspecPath}`);
