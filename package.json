@@ -12,6 +12,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "node bin/install-script.js",
+    "preuninstall": "node bin/uninstall-script.js",
     "bump-version": "bump-version",
     "bump-major": "bump-major",
     "bump-minor": "bump-minor",
@@ -42,6 +43,6 @@
     "node": ">=10.0.0"
   },
   "devDependencies": {
-    "pubspec-version-bumper": "github:dwaipayanray95/bump-version"
+    "bump-version": "github:dwaipayanray95/bump-version"
   }
 }

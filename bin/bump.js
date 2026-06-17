@@ -6,6 +6,17 @@ const readline = require('readline');
 
 const cwd = process.cwd();
 
+// Colors
+const colors = {
+  reset: "\x1b[0m",
+  bright: "\x1b[1m",
+  green: "\x1b[32m",
+  cyan: "\x1b[36m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  red: "\x1b[31m"
+};
+
 /**
  * AUTO-CONFIGURATION LOGIC
  */
@@ -33,7 +44,7 @@ function ensureShortcuts() {
 
       if (updated) {
         fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
-        console.log('✅ Updated your package.json with new bump shortcuts.');
+        console.log(`${colors.green}✅ Auto-configured your package.json with shortcuts.${colors.reset}`);
       }
     } catch (err) {}
   }
@@ -45,25 +56,10 @@ function ensureShortcuts() {
 function detectPlatforms() {
   const platforms = [];
   
-  // Tauri detection
-  if (fs.existsSync(path.join(cwd, 'src-tauri', 'tauri.conf.json'))) {
-    platforms.push('tauri');
-  } 
-  
-  // Flutter detection
-  if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) {
-    platforms.push('flutter');
-  }
-
-  // Rust (standard) detection
-  if (fs.existsSync(path.join(cwd, 'Cargo.toml')) && !platforms.includes('tauri')) {
-    platforms.push('rust');
-  }
-
-  // Node detection (if not already Tauri)
-  if (fs.existsSync(path.join(cwd, 'package.json')) && !platforms.includes('tauri')) {
-    platforms.push('node');
-  }
+  if (fs.existsSync(path.join(cwd, 'src-tauri', 'tauri.conf.json'))) platforms.push('tauri');
+  if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) platforms.push('flutter');
+  if (fs.existsSync(path.join(cwd, 'Cargo.toml')) && !platforms.includes('tauri')) platforms.push('rust');
+  if (fs.existsSync(path.join(cwd, 'package.json')) && !platforms.includes('tauri')) platforms.push('node');
 
   return platforms;
 }
@@ -77,57 +73,47 @@ function updateJson(filePath, newVersion) {
   const pkg = JSON.parse(content);
   pkg.version = newVersion;
   fs.writeFileSync(filePath, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`  - Updated ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.green}✔${colors.reset} Updated ${path.relative(cwd, filePath)}`);
 }
 
 function updateYaml(filePath, newVersion, isFlutter = false) {
   if (!fs.existsSync(filePath)) return;
   let content = fs.readFileSync(filePath, 'utf8');
-  
-  // Flutter/Pubspec specific regex for version: X.Y.Z+W
-  const regex = isFlutter 
-    ? /^version:\s+[\d\.]+\+\d+$/m 
-    : /^version:\s+[\d\.]+$/m;
-    
+  const regex = isFlutter ? /^version:\s+[\d\.]+\+\d+$/m : /^version:\s+[\d\.]+$/m;
   const replacement = isFlutter ? `version: ${newVersion}` : `version: ${newVersion}`;
   
   if (!content.match(regex)) {
-     // fallback to simpler match if complex one fails
      content = content.replace(/^version: .+$/m, `version: ${newVersion}`);
   } else {
      content = content.replace(regex, replacement);
   }
   
   fs.writeFileSync(filePath, content);
-  console.log(`  - Updated ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.green}✔${colors.reset} Updated ${path.relative(cwd, filePath)}`);
 }
 
 function updateToml(filePath, newVersion) {
   if (!fs.existsSync(filePath)) return;
   let content = fs.readFileSync(filePath, 'utf8');
-  
-  // Match version = "X.Y.Z" under [package]
   const regex = /^version\s*=\s*"[^"]*"/m;
   content = content.replace(regex, `version = "${newVersion}"`);
-  
   fs.writeFileSync(filePath, content);
-  console.log(`  - Updated ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.green}✔${colors.reset} Updated ${path.relative(cwd, filePath)}`);
 }
 
 /**
  * MAIN BUMP LOGIC
  */
 async function performBump(platform, type) {
-  console.log(`🔍 Platform detected: ${platform.toUpperCase()}`);
+  console.log(`\n${colors.cyan}🔍 Framework Identified: ${colors.bright}${platform.toUpperCase()}${colors.reset}`);
   
   let currentVersion = '';
   let buildNumber = '';
 
-  // 1. Get current version based on platform
   if (platform === 'flutter') {
     const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
     const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
-    if (!match) throw new Error('Could not parse Flutter version format (major.minor.patch+build)');
+    if (!match) throw new Error('Could not parse Flutter version (major.minor.patch+build)');
     currentVersion = `${match[1]}.${match[2]}.${match[3]}`;
     buildNumber = match[4];
   } else if (platform === 'node' || platform === 'tauri') {
@@ -140,9 +126,8 @@ async function performBump(platform, type) {
     currentVersion = match[1];
   }
 
-  // 2. Calculate new version
   let [major, minor, patch] = currentVersion.split('.').map(v => parseInt(v, 10));
-  const oldVersionDisplay = `${major}.${minor}.${patch}${buildNumber ? '+' + buildNumber : ''}`;
+  const oldVersionDisplay = `${colors.yellow}${major}.${minor}.${patch}${buildNumber ? '+' + buildNumber : ''}${colors.reset}`;
 
   if (type === 'major') { major++; minor = 0; patch = 0; }
   else if (type === 'minor') { minor++; patch = 0; }
@@ -150,10 +135,10 @@ async function performBump(platform, type) {
 
   const newVersionBase = `${major}.${minor}.${patch}`;
   const newVersionFull = buildNumber ? `${newVersionBase}+${buildNumber}` : newVersionBase;
+  const newVersionDisplay = `${colors.green}${newVersionFull}${colors.reset}`;
 
-  console.log(`🚀 Bumping ${oldVersionDisplay} → ${newVersionFull} (${type})`);
+  console.log(`🚀 ${colors.bright}Bumping ${oldVersionDisplay} → ${newVersionDisplay} ${colors.reset}(${type})\n`);
 
-  // 3. Apply updates
   if (platform === 'flutter') {
     updateYaml(path.join(cwd, 'pubspec.yaml'), newVersionFull, true);
   } else if (platform === 'node') {
@@ -165,27 +150,30 @@ async function performBump(platform, type) {
     updateJson(path.join(cwd, 'src-tauri', 'tauri.conf.json'), newVersionBase);
     updateToml(path.join(cwd, 'src-tauri', 'Cargo.toml'), newVersionBase);
   }
+  
+  console.log(`\n${colors.bright}${colors.green}✨ Version synchronization complete!${colors.reset}\n`);
 }
 
 /**
  * CLI ENTRY POINT
  */
 async function run() {
+  console.log(`${colors.bright}${colors.blue}>>> BUMP-VERSION v0.1.3${colors.reset}`);
+  
   ensureShortcuts();
 
   const detected = detectPlatforms();
   if (detected.length === 0) {
-    console.error('❌ Error: No supported project files found (package.json, pubspec.yaml, or Cargo.toml).');
+    console.error(`${colors.red}❌ Error: No supported project files found.${colors.reset}`);
     process.exit(1);
   }
 
-  // If multiple platforms detected (and not Tauri), ask the user
   let platform = detected[0];
   if (detected.length > 1 && !detected.includes('tauri')) {
      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-     console.log('\nMultiple platforms detected:');
-     detected.forEach((p, i) => console.log(`${i + 1}. ${p.toUpperCase()}`));
-     const choice = await new Promise(resolve => rl.question('\nWhich platform should I bump? ', resolve));
+     console.log(`\n${colors.yellow}Multiple platforms detected:${colors.reset}`);
+     detected.forEach((p, i) => console.log(`  ${i + 1}. ${p.toUpperCase()}`));
+     const choice = await new Promise(resolve => rl.question(`\nSelect target platform (1-${detected.length}): `, resolve));
      rl.close();
      platform = detected[parseInt(choice) - 1] || detected[0];
   }
@@ -200,12 +188,12 @@ async function run() {
 
   if (!bumpType) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    console.log(`\nSelected Platform: ${platform.toUpperCase()}`);
-    console.log('1. Major');
-    console.log('2. Minor');
-    console.log('3. Patch');
-    console.log('4. Exit');
-    const answer = await new Promise(resolve => rl.question('\nChoice (1-4): ', resolve));
+    console.log(`\n${colors.bright}Target: ${colors.cyan}${platform.toUpperCase()}${colors.reset}`);
+    console.log(`  ${colors.blue}1.${colors.reset} Major`);
+    console.log(`  ${colors.blue}2.${colors.reset} Minor`);
+    console.log(`  ${colors.blue}3.${colors.reset} Patch`);
+    console.log(`  ${colors.blue}4.${colors.reset} Exit`);
+    const answer = await new Promise(resolve => rl.question(`\n${colors.bright}Choice (1-4): ${colors.reset}`, resolve));
     rl.close();
     
     switch (answer.trim()) {
@@ -219,7 +207,7 @@ async function run() {
   try {
     await performBump(platform, bumpType);
   } catch (err) {
-    console.error(`❌ Error: ${err.message}`);
+    console.error(`\n${colors.red}❌ Error: ${err.message}${colors.reset}`);
     process.exit(1);
   }
 }

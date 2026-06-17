@@ -57,5 +57,17 @@ The tool uses a **Smart Hybrid Engine** to scan your project root:
 
 ---
 
+## 🗑 Removal
+
+If you ever need to remove `bump-version`, the process is clean and automated:
+
+```bash
+npm uninstall bump-version
+```
+
+**Self-Cleaning**: Our `preuninstall` script will automatically detect and remove the versioning shortcuts from your `package.json`, leaving your project exactly as it was.
+
+---
+
 *Built with ❤️ for developers who hate manual versioning.*
 *Contribute or report issues on [GitHub](https://github.com/dwaipayanray95/bump-version).*
