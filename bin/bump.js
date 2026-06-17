@@ -217,9 +217,9 @@ async function run() {
     console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
     console.log(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}`);
     
-    console.log(`\n  ${colors.green}1.${colors.reset} patch  ${colors.dim}${fmt(major, minor, patch)} → ${colors.green}${fmt(major, minor, patch + 1)}${colors.reset}`);
-    console.log(`  ${colors.yellow}2.${colors.reset} minor  ${colors.dim}${fmt(major, minor, patch)} → ${colors.yellow}${fmt(major, minor + 1, 0)}${colors.reset}`);
-    console.log(`  ${colors.red}3.${colors.reset} major  ${colors.dim}${fmt(major, minor, patch)} → ${colors.red}${fmt(major + 1, 0, 0)}${colors.reset}`);
+    console.log(`\n  1. ${colors.green}patch${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major, minor, patch + 1)}${colors.reset}`);
+    console.log(`  2. ${colors.yellow}minor${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major, minor + 1, 0)}${colors.reset}`);
+    console.log(`  3. ${colors.red}major${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major + 1, 0, 0)}${colors.reset}`);
     console.log(`  ${colors.dim}4. exit${colors.reset}`);
     
     const answer = await new Promise(resolve => rl.question(`\n${colors.bright}› ${colors.reset}`, resolve));
