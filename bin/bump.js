@@ -6,7 +6,7 @@ const readline = require('readline');
 
 const cwd = process.cwd();
 
-// Colors - Using a more refined palette
+// Colors - Refined palette
 const colors = {
   reset: "\x1b[0m",
   bright: "\x1b[1m",
@@ -15,7 +15,6 @@ const colors = {
   cyan: "\x1b[36m",
   yellow: "\x1b[33m",
   blue: "\x1b[34m",
-  magenta: "\x1b[35m",
   red: "\x1b[31m"
 };
 
@@ -49,10 +48,10 @@ async function ensureShortcuts() {
       }
 
       if (updated) {
-        process.stdout.write(`${colors.dim}configuring shortcuts...${colors.reset}`);
+        process.stdout.write(`${colors.dim}configuring shortcuts... ${colors.reset}`);
         fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
         await sleep(400);
-        process.stdout.write(`\r${colors.green}ready${colors.reset}\n`);
+        process.stdout.write(`${colors.green}ready${colors.reset}\n`);
       }
     } catch (err) {}
   }
@@ -79,7 +78,7 @@ function updateJson(filePath, newVersion) {
   const pkg = JSON.parse(content);
   pkg.version = newVersion;
   fs.writeFileSync(filePath, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`  ${colors.dim}update${colors.reset} ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.dim}sync${colors.reset} ${path.relative(cwd, filePath)}`);
 }
 
 function updateYaml(filePath, newVersion, isFlutter = false) {
@@ -92,7 +91,7 @@ function updateYaml(filePath, newVersion, isFlutter = false) {
      content = content.replace(regex, `version: ${newVersion}`);
   }
   fs.writeFileSync(filePath, content);
-  console.log(`  ${colors.dim}update${colors.reset} ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.dim}sync${colors.reset} ${path.relative(cwd, filePath)}`);
 }
 
 function updateToml(filePath, newVersion) {
@@ -101,7 +100,7 @@ function updateToml(filePath, newVersion) {
   const regex = /^version\s*=\s*"[^"]*"/m;
   content = content.replace(regex, `version = "${newVersion}"`);
   fs.writeFileSync(filePath, content);
-  console.log(`  ${colors.dim}update${colors.reset} ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.dim}sync${colors.reset} ${path.relative(cwd, filePath)}`);
 }
 
 /**
@@ -111,6 +110,7 @@ async function performBump(platform, type) {
   let currentVersion = '';
   let buildNumber = '';
 
+  // 1. Fetch current version
   if (platform === 'flutter') {
     const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
     const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
@@ -126,8 +126,9 @@ async function performBump(platform, type) {
     currentVersion = match[1];
   }
 
+  // 2. Calculate upgrade
   let [major, minor, patch] = currentVersion.split('.').map(v => parseInt(v, 10));
-  const oldVersionDisplay = `${colors.yellow}${major}.${minor}.${patch}${buildNumber ? '+' + buildNumber : ''}${colors.reset}`;
+  const oldVersionDisplay = `${major}.${minor}.${patch}${buildNumber ? '+' + buildNumber : ''}`;
 
   if (type === 'major') { major++; minor = 0; patch = 0; }
   else if (type === 'minor') { minor++; patch = 0; }
@@ -135,11 +136,12 @@ async function performBump(platform, type) {
 
   const newVersionBase = `${major}.${minor}.${patch}`;
   const newVersionFull = buildNumber ? `${newVersionBase}+${buildNumber}` : newVersionBase;
-  const newVersionDisplay = `${colors.green}${newVersionFull}${colors.reset}`;
 
-  console.log(`\n${colors.cyan}●${colors.reset} ${colors.bright}${platform.toUpperCase()}${colors.reset}`);
-  console.log(`${colors.dim}bumping${colors.reset} ${oldVersionDisplay} → ${newVersionDisplay} ${colors.dim}(${type})${colors.reset}\n`);
+  // 3. UI: Status Header
+  console.log(`\n${colors.cyan}●${colors.reset} ${colors.bright}Platform Detected:${colors.reset} ${colors.magenta}${platform.toUpperCase()}${colors.reset} ${colors.dim}v${oldVersionDisplay}${colors.reset}`);
+  console.log(`  ${colors.yellow}📂${colors.reset} ${colors.bright}Updated files:${colors.reset}`);
 
+  // 4. Perform Sync
   if (platform === 'flutter') updateYaml(path.join(cwd, 'pubspec.yaml'), newVersionFull, true);
   else if (platform === 'node') updateJson(path.join(cwd, 'package.json'), newVersionBase);
   else if (platform === 'rust') updateToml(path.join(cwd, 'Cargo.toml'), newVersionBase);
@@ -149,7 +151,8 @@ async function performBump(platform, type) {
     updateToml(path.join(cwd, 'src-tauri', 'Cargo.toml'), newVersionBase);
   }
   
-  console.log(`\n${colors.green}✔ done${colors.reset}\n`);
+  // 5. UI: Final Summary
+  console.log(`\n${colors.green}✔${colors.reset} ${colors.bright}done${colors.reset}  ${colors.dim}${oldVersionDisplay} ${colors.reset}🚀 ${colors.bright}${newVersionFull}${colors.reset} ${colors.cyan}(${type})${colors.reset}\n`);
 }
 
 /**
@@ -184,10 +187,7 @@ async function run() {
     else if (executableName.includes('patch')) bumpType = 'patch';
   }
 
-  if (bumpType && ['major', 'minor', 'patch'].includes(bumpType)) {
-    // direct mode
-  } else {
-    // interactive mode
+  if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
     console.log(`${colors.dim}target:${colors.reset} ${platform}`);
