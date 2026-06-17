@@ -7,10 +7,8 @@ A simple Node.js CLI tool to automatically bump the minor version of a Flutter/D
 You can install this directly from GitHub as a dev dependency in your project:
 
 ```bash
-npm install -D github:<your-username>/<your-repo-name>
+npm install -D github:dwaipayanray95/bump-version
 ```
-
-Replace `<your-username>` and `<your-repo-name>` with your GitHub details.
 
 ## Usage
 
