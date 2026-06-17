@@ -1,7 +1,7 @@
 {
   "name": "pubspec-version-bumper",
   "version": "1.0.0",
-  "description": "A simple Node.js CLI tool to bump the minor version in pubspec.yaml",
+  "description": "Intelligent universal version bumper for Flutter, Tauri, Node.js, and Rust. Auto-detects framework and syncs versioning across JSON, YAML, and TOML.",
   "main": "bin/bump.js",
   "bin": {
     "bump-version": "./bin/bump.js",
@@ -15,10 +15,14 @@
   },
   "keywords": [
     "flutter",
-    "pubspec",
-    "version",
-    "bumper",
-    "cli"
+    "tauri",
+    "rust",
+    "node",
+    "semver",
+    "version-bumper",
+    "automation",
+    "cli",
+    "ai-ready"
   ],
   "author": "dwaipayanray95",
   "license": "MIT",
