@@ -1,0 +1,24 @@
+{
+  "name": "pubspec-version-bumper",
+  "version": "1.0.0",
+  "description": "A simple Node.js CLI tool to bump the minor version in pubspec.yaml",
+  "main": "bin/bump.js",
+  "bin": {
+    "bump-version": "./bin/bump.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "flutter",
+    "pubspec",
+    "version",
+    "bumper",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=10.0.0"
+  }
+}
