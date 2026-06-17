@@ -1,7 +1,8 @@
 # 🚀 Universal Version Bumper (bump-version)
 
 [![GitHub stars](https://img.shields.io/github/stars/dwaipayanray95/bump-version.svg?style=social)](https://github.com/dwaipayanray95/bump-version)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Visitors](https://visitor-badge.laobi.icu/badge?page_id=dwaipayanray95.bump-version)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 **Automate your versioning workflow across any platform.** `bump-version` is an intelligent CLI tool that automatically detects your project framework and synchronizes version bumps across all required files (JSON, YAML, TOML).
 
