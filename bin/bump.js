@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 
 const cwd = process.cwd();
 
@@ -15,7 +14,9 @@ const colors = {
   cyan: "\x1b[36m",
   yellow: "\x1b[33m",
   blue: "\x1b[34m",
-  red: "\x1b[31m"
+  red: "\x1b[31m",
+  bgBlue: "\x1b[44m",
+  black: "\x1b[30m"
 };
 
 async function sleep(ms) {
@@ -110,7 +111,6 @@ async function performBump(platform, type) {
   let currentVersion = '';
   let buildNumber = '';
 
-  // 1. Fetch current version
   if (platform === 'flutter') {
     const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
     const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
@@ -126,7 +126,6 @@ async function performBump(platform, type) {
     currentVersion = match[1];
   }
 
-  // 2. Calculate upgrade
   let [major, minor, patch] = currentVersion.split('.').map(v => parseInt(v, 10));
   const oldVersionDisplay = `${major}.${minor}.${patch}${buildNumber ? '+' + buildNumber : ''}`;
 
@@ -137,11 +136,9 @@ async function performBump(platform, type) {
   const newVersionBase = `${major}.${minor}.${patch}`;
   const newVersionFull = buildNumber ? `${newVersionBase}+${buildNumber}` : newVersionBase;
 
-  // 3. UI: Status Header
   console.log(`\n${colors.cyan}●${colors.reset} ${colors.bright}Platform Detected:${colors.reset} ${colors.magenta}${platform.toUpperCase()}${colors.reset} ${colors.dim}v${oldVersionDisplay}${colors.reset}`);
   console.log(`  ${colors.yellow}📂${colors.reset} ${colors.bright}Updated files:${colors.reset}`);
 
-  // 4. Perform Sync
   if (platform === 'flutter') updateYaml(path.join(cwd, 'pubspec.yaml'), newVersionFull, true);
   else if (platform === 'node') updateJson(path.join(cwd, 'package.json'), newVersionBase);
   else if (platform === 'rust') updateToml(path.join(cwd, 'Cargo.toml'), newVersionBase);
@@ -151,8 +148,102 @@ async function performBump(platform, type) {
     updateToml(path.join(cwd, 'src-tauri', 'Cargo.toml'), newVersionBase);
   }
   
-  // 5. UI: Final Summary
   console.log(`\n${colors.green}✔${colors.reset} ${colors.bright}done${colors.reset}  ${colors.dim}${oldVersionDisplay} ${colors.reset}🚀 ${colors.bright}${newVersionFull}${colors.reset} ${colors.cyan}(${type})${colors.reset}\n`);
+}
+
+/**
+ * INTERACTIVE SELECTOR
+ */
+async function selectMenu(platform) {
+  let currentVersion = '';
+  let buildNumber = '';
+
+  try {
+    if (platform === 'flutter') {
+      const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
+      const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
+      if (match) { currentVersion = `${match[1]}.${match[2]}.${match[3]}`; buildNumber = match[4]; }
+    } else if (platform === 'node' || platform === 'tauri') {
+      const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
+      currentVersion = pkg.version;
+    } else if (platform === 'rust') {
+      const toml = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8');
+      const match = toml.match(/^version\s*=\s*"([^"]*)"/m);
+      if (match) currentVersion = match[1];
+    }
+  } catch (e) {}
+
+  let [major, minor, patch] = (currentVersion || '0.0.0').split('.').map(v => parseInt(v, 10));
+  const fmt = (ma, mi, pa) => `${ma}.${mi}.${pa}${buildNumber ? '+' + buildNumber : ''}`;
+
+  const options = [
+    { label: 'patch', type: 'patch', preview: `${fmt(major, minor, patch)} → ${fmt(major, minor, patch + 1)}`, color: colors.green },
+    { label: 'minor', type: 'minor', preview: `${fmt(major, minor, patch)} → ${fmt(major, minor + 1, 0)}`, color: colors.yellow },
+    { label: 'major', type: 'major', preview: `${fmt(major, minor, patch)} → ${fmt(major + 1, 0, 0)}`, color: colors.red },
+    { label: 'exit', type: 'exit', preview: '', color: colors.dim }
+  ];
+
+  let selectedIndex = 0;
+
+  function render() {
+    process.stdout.write('\x1B[?25l'); // Hide cursor
+    process.stdout.write('\r\x1B[K'); // Clear line
+    // Move cursor up to redraw the menu
+    if (selectedIndex >= 0) {
+      process.stdout.write(`\x1B[${options.length + 3}A`);
+    }
+
+    console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
+    console.log(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}\n`);
+
+    options.forEach((opt, i) => {
+      const isSelected = i === selectedIndex;
+      const prefix = isSelected ? `${colors.cyan}❯${colors.reset} ` : '  ';
+      const label = isSelected ? `${colors.bgBlue}${colors.black} ${opt.label} ${colors.reset}` : opt.color + opt.label + colors.reset;
+      const preview = opt.preview ? `  ${colors.dim}${opt.preview}${colors.reset}` : '';
+      
+      process.stdout.write('\x1B[K'); // Clear line
+      console.log(`${prefix}${label}${preview}`);
+    });
+  }
+
+  render();
+
+  return new Promise(resolve => {
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+
+    const onData = (key) => {
+      if (key === '\u0003') { // Ctrl+C
+        cleanup();
+        process.exit(0);
+      }
+      if (key === '\u001b[A') { // Up arrow
+        selectedIndex = (selectedIndex - 1 + options.length) % options.length;
+        render();
+      }
+      if (key === '\u001b[B') { // Down arrow
+        selectedIndex = (selectedIndex + 1) % options.length;
+        render();
+      }
+      if (key === '\r' || key === '\n') { // Enter
+        cleanup();
+        const selected = options[selectedIndex].type;
+        if (selected === 'exit') process.exit(0);
+        resolve(selected);
+      }
+    };
+
+    function cleanup() {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      process.stdin.removeListener('data', onData);
+      process.stdout.write('\x1B[?25h'); // Show cursor
+    }
+
+    process.stdin.on('data', onData);
+  });
 }
 
 /**
@@ -188,73 +279,9 @@ async function run() {
   }
 
   if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
-    // Calculate previews for the menu
-    let currentVersion = '';
-    let buildNumber = '';
-
-    try {
-      if (platform === 'flutter') {
-        const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
-        const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
-        if (match) {
-          currentVersion = `${match[1]}.${match[2]}.${match[3]}`;
-          buildNumber = match[4];
-        }
-      } else if (platform === 'node' || platform === 'tauri') {
-        const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
-        currentVersion = pkg.version;
-      } else if (platform === 'rust') {
-        const toml = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8');
-        const match = toml.match(/^version\s*=\s*"([^"]*)"/m);
-        if (match) currentVersion = match[1];
-      }
-    } catch (e) {}
-
-    let [major, minor, patch] = (currentVersion || '0.0.0').split('.').map(v => parseInt(v, 10));
-    const fmt = (ma, mi, pa) => `${ma}.${mi}.${pa}${buildNumber ? '+' + buildNumber : ''}`;
-
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
-    console.log(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}`);
-    
-    console.log(`\n  1. ${colors.green}patch${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major, minor, patch + 1)}${colors.reset}`);
-    console.log(`  2. ${colors.yellow}minor${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major, minor + 1, 0)}${colors.reset}`);
-    console.log(`  3. ${colors.red}major${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major + 1, 0, 0)}${colors.reset}`);
-    console.log(`  ${colors.dim}4. exit${colors.reset}`);
-    
-    process.stdout.write(`\n${colors.bright}› ${colors.reset}`);
-    
-    const choice = await new Promise(resolve => {
-      process.stdin.setRawMode(true);
-      process.stdin.resume();
-      process.stdin.setEncoding('utf8');
-      
-      const onData = (key) => {
-        // Handle Ctrl+C (SIGINT)
-        if (key === '\u0003') {
-          process.stdin.setRawMode(false);
-          process.stdin.pause();
-          process.stdin.removeListener('data', onData);
-          process.exit(0);
-        }
-        
-        if (['1', '2', '3', '4'].includes(key)) {
-          process.stdin.setRawMode(false);
-          process.stdin.pause();
-          process.stdin.removeListener('data', onData);
-          process.stdout.write(key + '\n');
-          resolve(key);
-        }
-      };
-      process.stdin.on('data', onData);
-    });
-    
-    switch (choice) {
-      case '1': bumpType = 'patch'; break;
-      case '2': bumpType = 'minor'; break;
-      case '3': bumpType = 'major'; break;
-      default: return;
-    }
+    bumpType = await selectMenu(platform);
+  } else {
+     console.log(`${colors.bright}${colors.blue}>>> BUMP-VERSION v0.1.3${colors.reset}`);
   }
 
   try {
