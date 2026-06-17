@@ -188,20 +188,47 @@ async function run() {
   }
 
   if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
+    // Calculate previews for the menu
+    let currentVersion = '';
+    let buildNumber = '';
+
+    try {
+      if (platform === 'flutter') {
+        const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
+        const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
+        if (match) {
+          currentVersion = `${match[1]}.${match[2]}.${match[3]}`;
+          buildNumber = match[4];
+        }
+      } else if (platform === 'node' || platform === 'tauri') {
+        const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
+        currentVersion = pkg.version;
+      } else if (platform === 'rust') {
+        const toml = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8');
+        const match = toml.match(/^version\s*=\s*"([^"]*)"/m);
+        if (match) currentVersion = match[1];
+      }
+    } catch (e) {}
+
+    let [major, minor, patch] = (currentVersion || '0.0.0').split('.').map(v => parseInt(v, 10));
+    const fmt = (ma, mi, pa) => `${ma}.${mi}.${pa}${buildNumber ? '+' + buildNumber : ''}`;
+
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
-    console.log(`${colors.dim}target:${colors.reset} ${platform}`);
-    console.log(`\n  ${colors.cyan}1.${colors.reset} major`);
-    console.log(`  ${colors.cyan}2.${colors.reset} minor`);
-    console.log(`  ${colors.cyan}3.${colors.reset} patch`);
+    console.log(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}`);
+    
+    console.log(`\n  ${colors.green}1.${colors.reset} patch  ${colors.dim}${fmt(major, minor, patch)} → ${colors.green}${fmt(major, minor, patch + 1)}${colors.reset}`);
+    console.log(`  ${colors.yellow}2.${colors.reset} minor  ${colors.dim}${fmt(major, minor, patch)} → ${colors.yellow}${fmt(major, minor + 1, 0)}${colors.reset}`);
+    console.log(`  ${colors.red}3.${colors.reset} major  ${colors.dim}${fmt(major, minor, patch)} → ${colors.red}${fmt(major + 1, 0, 0)}${colors.reset}`);
     console.log(`  ${colors.dim}4. exit${colors.reset}`);
+    
     const answer = await new Promise(resolve => rl.question(`\n${colors.bright}› ${colors.reset}`, resolve));
     rl.close();
     
     switch (answer.trim()) {
-      case '1': bumpType = 'major'; break;
+      case '1': bumpType = 'patch'; break;
       case '2': bumpType = 'minor'; break;
-      case '3': bumpType = 'patch'; break;
+      case '3': bumpType = 'major'; break;
       default: return;
     }
   }
