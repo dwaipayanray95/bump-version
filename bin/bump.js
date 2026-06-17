@@ -222,10 +222,34 @@ async function run() {
     console.log(`  3. ${colors.red}major${colors.reset}  ${colors.dim}${fmt(major, minor, patch)} → ${fmt(major + 1, 0, 0)}${colors.reset}`);
     console.log(`  ${colors.dim}4. exit${colors.reset}`);
     
-    const answer = await new Promise(resolve => rl.question(`\n${colors.bright}› ${colors.reset}`, resolve));
-    rl.close();
+    process.stdout.write(`\n${colors.bright}› ${colors.reset}`);
     
-    switch (answer.trim()) {
+    const choice = await new Promise(resolve => {
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.setEncoding('utf8');
+      
+      const onData = (key) => {
+        // Handle Ctrl+C (SIGINT)
+        if (key === '\u0003') {
+          process.stdin.setRawMode(false);
+          process.stdin.pause();
+          process.stdin.removeListener('data', onData);
+          process.exit(0);
+        }
+        
+        if (['1', '2', '3', '4'].includes(key)) {
+          process.stdin.setRawMode(false);
+          process.stdin.pause();
+          process.stdin.removeListener('data', onData);
+          process.stdout.write(key + '\n');
+          resolve(key);
+        }
+      };
+      process.stdin.on('data', onData);
+    });
+    
+    switch (choice) {
       case '1': bumpType = 'patch'; break;
       case '2': bumpType = 'minor'; break;
       case '3': bumpType = 'major'; break;
