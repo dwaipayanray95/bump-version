@@ -4,7 +4,10 @@
   "description": "A simple Node.js CLI tool to bump the minor version in pubspec.yaml",
   "main": "bin/bump.js",
   "bin": {
-    "bump-version": "./bin/bump.js"
+    "bump-version": "./bin/bump.js",
+    "bump-major": "./bin/bump.js",
+    "bump-minor": "./bin/bump.js",
+    "bump-patch": "./bin/bump.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
