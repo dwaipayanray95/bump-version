@@ -18,7 +18,8 @@ const colors = {
   blue: "\x1b[34m",
   red: "\x1b[31m",
   bgBlue: "\x1b[44m",
-  black: "\x1b[30m"
+  black: "\x1b[30m",
+  magenta: "\x1b[35m"
 };
 
 async function sleep(ms) {
@@ -32,7 +33,6 @@ async function ensureShortcuts() {
   const packageJsonPath = path.resolve(cwd, 'package.json');
   const gitignorePath = path.resolve(cwd, '.gitignore');
 
-  // 1. Ensure .gitignore handles history file
   if (fs.existsSync(gitignorePath)) {
     try {
       const content = fs.readFileSync(gitignorePath, 'utf8');
@@ -42,7 +42,6 @@ async function ensureShortcuts() {
     } catch (e) {}
   }
 
-  // 2. Ensure package.json shortcuts
   if (fs.existsSync(packageJsonPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -126,40 +125,21 @@ function updateToml(filePath, newVersion, silent = false) {
 function saveToHistory(platform, files) {
   let history = [];
   try {
-    if (fs.existsSync(historyPath)) {
-      history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-    }
+    if (fs.existsSync(historyPath)) history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
   } catch (e) {}
 
-  history.unshift({
-    timestamp: new Date().toISOString(),
-    platform,
-    files
-  });
-
-  // Keep last 2 undos
+  history.unshift({ timestamp: new Date().toISOString(), platform, files });
   history = history.slice(0, 2);
   fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
 }
 
 async function performUndo() {
   if (!fs.existsSync(historyPath)) {
-    console.error(`${colors.red}error: no history found to undo${colors.reset}`);
+    console.error(`${colors.red}error: no history found${colors.reset}`);
     return;
   }
-
-  let history = [];
-  try {
-    history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-  } catch (e) {
-    console.error(`${colors.red}error: history file corrupted${colors.reset}`);
-    return;
-  }
-
-  if (history.length === 0) {
-    console.error(`${colors.red}error: undo history is empty${colors.reset}`);
-    return;
-  }
+  let history = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
+  if (history.length === 0) return;
 
   const lastState = history.shift();
   console.log(`\n${colors.cyan}↺${colors.reset} ${colors.bright}Restoring Previous Version...${colors.reset}`);
@@ -178,14 +158,13 @@ async function performUndo() {
 /**
  * MAIN BUMP LOGIC
  */
-async function performBump(platform, type) {
+async function performBump(platform, type, manualVersion = null) {
   if (type === 'undo') return performUndo();
 
   let currentVersion = '';
   let buildNumber = '';
   let fileVersionsBefore = {};
 
-  // 1. Snapshot and Detection
   if (platform === 'flutter') {
     const pubspec = fs.readFileSync(path.join(cwd, 'pubspec.yaml'), 'utf8');
     const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
@@ -193,51 +172,39 @@ async function performBump(platform, type) {
     currentVersion = `${match[1]}.${match[2]}.${match[3]}`;
     buildNumber = match[4];
     fileVersionsBefore['pubspec.yaml'] = `${currentVersion}+${buildNumber}`;
-  } else if (platform === 'node') {
+  } else if (platform === 'node' || platform === 'tauri') {
     const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
     currentVersion = pkg.version;
     fileVersionsBefore['package.json'] = currentVersion;
+    if (platform === 'tauri') {
+      try { fileVersionsBefore['src-tauri/tauri.conf.json'] = JSON.parse(fs.readFileSync(path.join(cwd, 'src-tauri', 'tauri.conf.json'), 'utf8')).version; } catch(e) {}
+      try { const cm = fs.readFileSync(path.join(cwd, 'src-tauri', 'Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]*)"/m); if (cm) fileVersionsBefore['src-tauri/Cargo.toml'] = cm[1]; } catch(e) {}
+    }
   } else if (platform === 'rust') {
-    const toml = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8');
-    const match = toml.match(/^version\s*=\s*"([^"]*)"/m);
-    currentVersion = match[1];
-    fileVersionsBefore['Cargo.toml'] = currentVersion;
-  } else if (platform === 'tauri') {
-    const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
-    currentVersion = pkg.version;
-    fileVersionsBefore['package.json'] = currentVersion;
-    
-    try {
-      const tConf = JSON.parse(fs.readFileSync(path.join(cwd, 'src-tauri', 'tauri.conf.json'), 'utf8'));
-      fileVersionsBefore['src-tauri/tauri.conf.json'] = tConf.version;
-    } catch(e) {}
-    
-    try {
-      const cToml = fs.readFileSync(path.join(cwd, 'src-tauri', 'Cargo.toml'), 'utf8');
-      const cMatch = cToml.match(/^version\s*=\s*"([^"]*)"/m);
-      if (cMatch) fileVersionsBefore['src-tauri/Cargo.toml'] = cMatch[1];
-    } catch(e) {}
+    const match = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]*)"/m);
+    if (match) { currentVersion = match[1]; fileVersionsBefore['Cargo.toml'] = currentVersion; }
   }
 
-  // 2. Calculate upgrade
   let [major, minor, patch] = currentVersion.split('.').map(v => parseInt(v, 10));
   const oldVersionDisplay = `${major}.${minor}.${patch}${buildNumber ? '+' + buildNumber : ''}`;
 
-  if (type === 'major') { major++; minor = 0; patch = 0; }
-  else if (type === 'minor') { minor++; patch = 0; }
-  else if (type === 'patch') { patch++; }
+  let newVersionBase = '';
+  if (type === 'manual') {
+    newVersionBase = manualVersion;
+  } else {
+    if (type === 'major') { major++; minor = 0; patch = 0; }
+    else if (type === 'minor') { minor++; patch = 0; }
+    else if (type === 'patch') { patch++; }
+    newVersionBase = `${major}.${minor}.${patch}`;
+  }
 
-  const newVersionBase = `${major}.${minor}.${patch}`;
   const newVersionFull = buildNumber ? `${newVersionBase}+${buildNumber}` : newVersionBase;
 
-  // 3. Save History
   saveToHistory(platform, fileVersionsBefore);
 
-  // 4. UI: Status Header
   console.log(`\n${colors.cyan}●${colors.reset} ${colors.bright}Platform Detected:${colors.reset} ${colors.magenta}${platform.toUpperCase()}${colors.reset} ${colors.dim}v${oldVersionDisplay}${colors.reset}`);
   console.log(`  ${colors.yellow}📂${colors.reset} ${colors.bright}Updated files:${colors.reset}`);
 
-  // 5. Perform Sync
   if (platform === 'flutter') updateYaml(path.join(cwd, 'pubspec.yaml'), newVersionFull, true);
   else if (platform === 'node') updateJson(path.join(cwd, 'package.json'), newVersionBase);
   else if (platform === 'rust') updateToml(path.join(cwd, 'Cargo.toml'), newVersionBase);
@@ -249,7 +216,6 @@ async function performBump(platform, type) {
     console.log(`  ${colors.dim}sync${colors.reset} src-tauri/Cargo.toml`);
   }
   
-  // 6. UI: Final Summary
   console.log(`\n${colors.green}✔ done${colors.reset}  ${colors.dim}${oldVersionDisplay} ${colors.reset}🚀 ${colors.bright}${newVersionFull}${colors.reset} ${colors.cyan}(${type})${colors.reset}\n`);
 }
 
@@ -267,11 +233,9 @@ async function selectMenu(platform) {
       const match = pubspec.match(/^version:\s+(\d+)\.(\d+)\.(\d+)\+(\d+)$/m);
       if (match) { currentVersion = `${match[1]}.${match[2]}.${match[3]}`; buildNumber = match[4]; }
     } else if (platform === 'node' || platform === 'tauri') {
-      const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
-      currentVersion = pkg.version;
+      currentVersion = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')).version;
     } else if (platform === 'rust') {
-      const toml = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8');
-      const match = toml.match(/^version\s*=\s*"([^"]*)"/m);
+      const match = fs.readFileSync(path.join(cwd, 'Cargo.toml'), 'utf8').match(/^version\s*=\s*"([^"]*)"/m);
       if (match) currentVersion = match[1];
     }
   } catch (e) {}
@@ -280,34 +244,27 @@ async function selectMenu(platform) {
   const fmt = (ma, mi, pa) => `${ma}.${mi}.${pa}${buildNumber ? '+' + buildNumber : ''}`;
 
   const options = [
-    { label: 'patch', type: 'patch', preview: `${fmt(major, minor, patch)} → ${fmt(major, minor, patch + 1)}`, color: colors.green },
-    { label: 'minor', type: 'minor', preview: `${fmt(major, minor, patch)} → ${fmt(major, minor + 1, 0)}`, color: colors.yellow },
-    { label: 'major', type: 'major', preview: `${fmt(major, minor, patch)} → ${fmt(major + 1, 0, 0)}`, color: colors.red }
+    { label: 'patch ', type: 'patch', preview: `${fmt(major, minor, patch)} → ${fmt(major, minor, patch + 1)}`, color: colors.green },
+    { label: 'minor ', type: 'minor', preview: `${fmt(major, minor, patch)} → ${fmt(major, minor + 1, 0)}`, color: colors.yellow },
+    { label: 'major ', type: 'major', preview: `${fmt(major, minor, patch)} → ${fmt(major + 1, 0, 0)}`, color: colors.red }
   ];
 
-  if (hasHistory) {
-    options.push({ label: 'undo ', type: 'undo', preview: '(revert last change)', color: colors.cyan });
-  }
-
-  options.push({ label: 'exit ', type: 'exit', preview: '', color: colors.dim });
+  if (hasHistory) options.push({ label: 'undo  ', type: 'undo', preview: '(revert last change)', color: colors.cyan });
+  options.push({ label: 'manual', type: 'manual', preview: '(enter custom version)', color: colors.magenta });
+  options.push({ label: 'exit  ', type: 'exit', preview: '', color: colors.dim });
 
   let selectedIndex = 0;
   let firstRender = true;
 
   function render() {
     const linesToMoveUp = options.length + 4;
-    if (!firstRender) {
-      readline.moveCursor(process.stdout, 0, -linesToMoveUp);
-    }
+    if (!firstRender) readline.moveCursor(process.stdout, 0, -linesToMoveUp);
     firstRender = false;
     process.stdout.write('\x1B[?25l');
-
     readline.clearLine(process.stdout, 0);
     process.stdout.write(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}\n`);
-    
     readline.clearLine(process.stdout, 0);
     process.stdout.write(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}\n\n`);
-
     options.forEach((opt, i) => {
       const isSelected = i === selectedIndex;
       readline.clearLine(process.stdout, 0);
@@ -330,13 +287,33 @@ async function selectMenu(platform) {
       if (key === '\u001b[A') { selectedIndex = (selectedIndex - 1 + options.length) % options.length; render(); }
       if (key === '\u001b[B') { selectedIndex = (selectedIndex + 1) % options.length; render(); }
       if (key === '\r' || key === '\n') {
-        cleanup();
         const selected = options[selectedIndex].type;
-        if (selected === 'exit') process.exit(0);
-        resolve(selected);
+        if (selected === 'manual') {
+          cleanup();
+          const rlManual = readline.createInterface({ input: process.stdin, output: process.stdout });
+          process.stdout.write(`\n${colors.bright}Enter custom version (x.y.z): ${colors.reset}`);
+          rlManual.on('line', (input) => {
+            const customVersion = input.trim();
+            if (!/^\d+\.\d+\.\d+$/.test(customVersion)) {
+              process.stdout.write(`${colors.red}invalid format. use x.y.z${colors.reset}\n`);
+              process.stdout.write(`${colors.bright}Enter custom version (x.y.z): ${colors.reset}`);
+              return;
+            }
+            process.stdout.write(`\n${colors.dim}current: ${colors.reset}${fmt(major, minor, patch)}`);
+            process.stdout.write(`\n${colors.bright}custom:  ${colors.reset}${colors.magenta}${customVersion}${buildNumber ? '+' + buildNumber : ''}${colors.reset}`);
+            rlManual.question(`\n\n${colors.bright}Are you sure? (y/n): ${colors.reset}`, (ans) => {
+              rlManual.close();
+              if (ans.toLowerCase() === 'y') resolve({ type: 'manual', version: customVersion });
+              else { console.log(`${colors.dim}aborted.${colors.reset}`); process.exit(0); }
+            });
+          });
+        } else {
+          cleanup();
+          if (selected === 'exit') process.exit(0);
+          resolve(selected);
+        }
       }
     };
-
     function cleanup() {
       process.stdin.setRawMode(false);
       process.stdin.pause();
@@ -347,51 +324,37 @@ async function selectMenu(platform) {
   });
 }
 
-/**
- * CLI ENTRY POINT
- */
 async function run() {
   await ensureShortcuts();
-
   const detected = detectPlatforms();
-  if (detected.length === 0) {
-    console.error(`${colors.red}error: no supported project found${colors.reset}`);
-    process.exit(1);
-  }
-
+  if (detected.length === 0) { console.error(`${colors.red}error: no supported project found${colors.reset}`); process.exit(1); }
   let platform = detected[0];
   if (detected.length > 1 && !detected.includes('tauri')) {
      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-     console.log(`\n${colors.cyan}platforms detected:${colors.reset}`);
-     detected.forEach((p, i) => console.log(`  ${colors.dim}${i + 1}.${colors.reset} ${p}`));
-     const choice = await new Promise(resolve => rl.question(`\n${colors.bright}select (1-${detected.length}): ${colors.reset}`, resolve));
-     rl.close();
-     platform = detected[parseInt(choice) - 1] || detected[0];
+     detected.forEach((p, i) => console.log(`${i + 1}. ${p.toUpperCase()}`));
+     const choice = await new Promise(resolve => rl.question(`select (1-${detected.length}): `, resolve));
+     rl.close(); platform = detected[parseInt(choice) - 1] || detected[0];
   }
 
   const args = process.argv.slice(2);
-  const executableName = path.basename(process.argv[1]);
-  let bumpType = args[0];
-
-  if (!bumpType) {
-    if (executableName.includes('major')) bumpType = 'major';
-    else if (executableName.includes('minor')) bumpType = 'minor';
-    else if (executableName.includes('patch')) bumpType = 'patch';
-    else if (executableName.includes('undo')) bumpType = 'undo';
+  const ex = path.basename(process.argv[1]);
+  let type = args[0];
+  if (!type) {
+    if (ex.includes('major')) type = 'major';
+    else if (ex.includes('minor')) type = 'minor';
+    else if (ex.includes('patch')) type = 'patch';
+    else if (ex.includes('undo')) type = 'undo';
   }
 
-  if (!bumpType || !['major', 'minor', 'patch', 'undo'].includes(bumpType)) {
-    bumpType = await selectMenu(platform);
-  } else {
-     if (bumpType !== 'undo') console.log(`${colors.bright}${colors.blue}>>> BUMP-VERSION v0.1.3${colors.reset}`);
+  let manualVer = null;
+  if (!type || !['major', 'minor', 'patch', 'undo'].includes(type)) {
+    const res = await selectMenu(platform);
+    if (typeof res === 'object') { type = res.type; manualVer = res.version; }
+    else type = res;
   }
 
-  try {
-    await performBump(platform, bumpType);
-  } catch (err) {
-    console.error(`\n${colors.red}error: ${err.message}${colors.reset}`);
-    process.exit(1);
-  }
+  try { await performBump(platform, type, manualVer); }
+  catch (err) { console.error(`\n${colors.red}error: ${err.message}${colors.reset}`); process.exit(1); }
 }
 
 run();
