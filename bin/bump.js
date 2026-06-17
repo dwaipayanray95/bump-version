@@ -184,26 +184,33 @@ async function selectMenu(platform) {
   ];
 
   let selectedIndex = 0;
+  let firstRender = true;
 
   function render() {
-    process.stdout.write('\x1B[?25l'); // Hide cursor
-    process.stdout.write('\r\x1B[K'); // Clear line
-    // Move cursor up to redraw the menu
-    if (selectedIndex >= 0) {
-      process.stdout.write(`\x1B[${options.length + 3}A`);
+    const linesToMoveUp = options.length + 4; // Header lines + padding + options
+    
+    if (!firstRender) {
+      readline.moveCursor(process.stdout, 0, -linesToMoveUp);
     }
+    firstRender = false;
 
-    console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
-    console.log(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}\n`);
+    process.stdout.write('\x1B[?25l'); // Hide cursor
 
+    // 1. Header Area
+    readline.clearLine(process.stdout, 0);
+    process.stdout.write(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}\n`);
+    
+    readline.clearLine(process.stdout, 0);
+    process.stdout.write(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}\n\n`);
+
+    // 2. Options Area
     options.forEach((opt, i) => {
       const isSelected = i === selectedIndex;
+      readline.clearLine(process.stdout, 0);
       const prefix = isSelected ? `${colors.cyan}❯${colors.reset} ` : '  ';
       const label = isSelected ? `${colors.bgBlue}${colors.black} ${opt.label} ${colors.reset}` : opt.color + opt.label + colors.reset;
       const preview = opt.preview ? `  ${colors.dim}${opt.preview}${colors.reset}` : '';
-      
-      process.stdout.write('\x1B[K'); // Clear line
-      console.log(`${prefix}${label}${preview}`);
+      process.stdout.write(`${prefix}${label}${preview}\n`);
     });
   }
 
