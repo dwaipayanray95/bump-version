@@ -1,6 +1,6 @@
 {
   "name": "bump-version",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Intelligent universal version bumper for Flutter, Tauri, Node.js, and Rust. Auto-detects framework and syncs versioning across JSON, YAML, and TOML.",
   "main": "bin/bump.js",
   "bin": {
