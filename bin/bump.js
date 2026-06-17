@@ -30,13 +30,13 @@ function ensureShortcuts() {
 
       const shortcuts = {
         'bump-version': 'bump-version',
-        'bump-major': 'bump-major',
-        'bump-minor': 'bump-minor',
-        'bump-patch': 'bump-patch'
+        'bump-major': 'bump-version major',
+        'bump-minor': 'bump-version minor',
+        'bump-patch': 'bump-version patch'
       };
 
       for (const [name, cmd] of Object.entries(shortcuts)) {
-        if (!pkg.scripts[name]) {
+        if (!pkg.scripts[name] || pkg.scripts[name] === name) {
           pkg.scripts[name] = cmd;
           updated = true;
         }
@@ -180,13 +180,27 @@ async function run() {
 
   const args = process.argv.slice(2);
   const executableName = path.basename(process.argv[1]);
+  
+  // 1. Check if type is passed as an argument (highest priority)
   let bumpType = args[0];
 
-  if (executableName.includes('major')) bumpType = 'major';
-  else if (executableName.includes('minor')) bumpType = 'minor';
-  else if (executableName.includes('patch')) bumpType = 'patch';
-
+  // 2. Fallback: Detect type based on command name (if run directly as a bin)
   if (!bumpType) {
+    if (executableName.includes('major')) bumpType = 'major';
+    else if (executableName.includes('minor')) bumpType = 'minor';
+    else if (executableName.includes('patch')) bumpType = 'patch';
+  }
+
+  // Validate the bump type; if invalid or missing, enter Interactive Mode
+  if (bumpType && ['major', 'minor', 'patch'].includes(bumpType)) {
+    try {
+      await performBump(platform, bumpType);
+    } catch (err) {
+      console.error(`\n${colors.red}❌ Error: ${err.message}${colors.reset}`);
+      process.exit(1);
+    }
+  } else {
+    // Interactive Mode
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     console.log(`\n${colors.bright}Target: ${colors.cyan}${platform.toUpperCase()}${colors.reset}`);
     console.log(`  ${colors.blue}1.${colors.reset} Major`);

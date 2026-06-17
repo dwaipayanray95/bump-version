@@ -46,15 +46,15 @@ async function run() {
 
       const shortcuts = {
         'bump-version': 'bump-version',
-        'bump-major': 'bump-major',
-        'bump-minor': 'bump-minor',
-        'bump-patch': 'bump-patch'
+        'bump-major': 'bump-version major',
+        'bump-minor': 'bump-version minor',
+        'bump-patch': 'bump-version patch'
       };
 
       await showProgressBar("🔍 Analyzing project structure...", 600);
 
       for (const [name, cmd] of Object.entries(shortcuts)) {
-        if (!pkg.scripts[name]) {
+        if (!pkg.scripts[name] || pkg.scripts[name] === name) {
           pkg.scripts[name] = cmd;
           updated = true;
         }
