@@ -6,36 +6,21 @@ const readline = require('readline');
 
 const cwd = process.cwd();
 
-// Colors
+// Colors - Using a more refined palette
 const colors = {
   reset: "\x1b[0m",
   bright: "\x1b[1m",
+  dim: "\x1b[2m",
   green: "\x1b[32m",
   cyan: "\x1b[36m",
   yellow: "\x1b[33m",
   blue: "\x1b[34m",
+  magenta: "\x1b[35m",
   red: "\x1b[31m"
 };
 
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function showProgressBar(message, duration) {
-  const width = 30;
-  for (let i = 0; i <= width; i++) {
-    const percent = Math.round((i / width) * 100);
-    const bar = "█".repeat(i) + "░".repeat(width - i);
-    process.stdout.write(`\r${colors.cyan}${message}${colors.reset} [${bar}] ${percent}% `);
-    await sleep(duration / width);
-  }
-  process.stdout.write("\n");
-}
-
-function showBanner() {
-  console.log(`\n${colors.bright}${colors.blue}╔═══════════════════════════════════════════════════╗${colors.reset}`);
-  console.log(`${colors.bright}${colors.blue}║          🚀 BUMP-VERSION UNIVERSAL v0.1.3         ║${colors.reset}`);
-  console.log(`${colors.bright}${colors.blue}╚═══════════════════════════════════════════════════╝${colors.reset}\n`);
 }
 
 /**
@@ -64,11 +49,10 @@ async function ensureShortcuts() {
       }
 
       if (updated) {
-        showBanner();
-        await showProgressBar("🔍 Initializing project shortcuts...", 800);
+        process.stdout.write(`${colors.dim}configuring shortcuts...${colors.reset}`);
         fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
-        console.log(`${colors.green}✅ Project successfully configured for auto-versioning.${colors.reset}\n`);
         await sleep(400);
+        process.stdout.write(`\r${colors.green}ready${colors.reset}\n`);
       }
     } catch (err) {}
   }
@@ -95,7 +79,7 @@ function updateJson(filePath, newVersion) {
   const pkg = JSON.parse(content);
   pkg.version = newVersion;
   fs.writeFileSync(filePath, JSON.stringify(pkg, null, 2) + '\n');
-  console.log(`  ${colors.green}✔${colors.reset} Updated ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.dim}update${colors.reset} ${path.relative(cwd, filePath)}`);
 }
 
 function updateYaml(filePath, newVersion, isFlutter = false) {
@@ -108,7 +92,7 @@ function updateYaml(filePath, newVersion, isFlutter = false) {
      content = content.replace(regex, `version: ${newVersion}`);
   }
   fs.writeFileSync(filePath, content);
-  console.log(`  ${colors.green}✔${colors.reset} Updated ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.dim}update${colors.reset} ${path.relative(cwd, filePath)}`);
 }
 
 function updateToml(filePath, newVersion) {
@@ -117,15 +101,13 @@ function updateToml(filePath, newVersion) {
   const regex = /^version\s*=\s*"[^"]*"/m;
   content = content.replace(regex, `version = "${newVersion}"`);
   fs.writeFileSync(filePath, content);
-  console.log(`  ${colors.green}✔${colors.reset} Updated ${path.relative(cwd, filePath)}`);
+  console.log(`  ${colors.dim}update${colors.reset} ${path.relative(cwd, filePath)}`);
 }
 
 /**
  * MAIN BUMP LOGIC
  */
 async function performBump(platform, type) {
-  console.log(`${colors.cyan}🔍 Framework Identified: ${colors.bright}${platform.toUpperCase()}${colors.reset}`);
-  
   let currentVersion = '';
   let buildNumber = '';
 
@@ -155,7 +137,8 @@ async function performBump(platform, type) {
   const newVersionFull = buildNumber ? `${newVersionBase}+${buildNumber}` : newVersionBase;
   const newVersionDisplay = `${colors.green}${newVersionFull}${colors.reset}`;
 
-  console.log(`🚀 ${colors.bright}Bumping ${oldVersionDisplay} → ${newVersionDisplay} ${colors.reset}(${type})\n`);
+  console.log(`\n${colors.cyan}●${colors.reset} ${colors.bright}${platform.toUpperCase()}${colors.reset}`);
+  console.log(`${colors.dim}bumping${colors.reset} ${oldVersionDisplay} → ${newVersionDisplay} ${colors.dim}(${type})${colors.reset}\n`);
 
   if (platform === 'flutter') updateYaml(path.join(cwd, 'pubspec.yaml'), newVersionFull, true);
   else if (platform === 'node') updateJson(path.join(cwd, 'package.json'), newVersionBase);
@@ -166,7 +149,7 @@ async function performBump(platform, type) {
     updateToml(path.join(cwd, 'src-tauri', 'Cargo.toml'), newVersionBase);
   }
   
-  console.log(`\n${colors.bright}${colors.green}✨ Version synchronization complete!${colors.reset}\n`);
+  console.log(`\n${colors.green}✔ done${colors.reset}\n`);
 }
 
 /**
@@ -177,16 +160,16 @@ async function run() {
 
   const detected = detectPlatforms();
   if (detected.length === 0) {
-    console.error(`${colors.red}❌ Error: No supported project files found.${colors.reset}`);
+    console.error(`${colors.red}error: no supported project found${colors.reset}`);
     process.exit(1);
   }
 
   let platform = detected[0];
   if (detected.length > 1 && !detected.includes('tauri')) {
      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-     console.log(`\n${colors.yellow}Multiple platforms detected:${colors.reset}`);
-     detected.forEach((p, i) => console.log(`  ${i + 1}. ${p.toUpperCase()}`));
-     const choice = await new Promise(resolve => rl.question(`\nSelect target platform (1-${detected.length}): `, resolve));
+     console.log(`\n${colors.cyan}platforms detected:${colors.reset}`);
+     detected.forEach((p, i) => console.log(`  ${colors.dim}${i + 1}.${colors.reset} ${p}`));
+     const choice = await new Promise(resolve => rl.question(`\n${colors.bright}select (1-${detected.length}): ${colors.reset}`, resolve));
      rl.close();
      platform = detected[parseInt(choice) - 1] || detected[0];
   }
@@ -202,30 +185,31 @@ async function run() {
   }
 
   if (bumpType && ['major', 'minor', 'patch'].includes(bumpType)) {
-    console.log(`${colors.bright}${colors.blue}>>> BUMP-VERSION v0.1.3${colors.reset}`);
+    // direct mode
   } else {
-    showBanner();
+    // interactive mode
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    console.log(`${colors.bright}Target: ${colors.cyan}${platform.toUpperCase()}${colors.reset}`);
-    console.log(`  ${colors.blue}1.${colors.reset} Major`);
-    console.log(`  ${colors.blue}2.${colors.reset} Minor`);
-    console.log(`  ${colors.blue}3.${colors.reset} Patch`);
-    console.log(`  ${colors.blue}4.${colors.reset} Exit`);
-    const answer = await new Promise(resolve => rl.question(`\n${colors.bright}Choice (1-4): ${colors.reset}`, resolve));
+    console.log(`\n${colors.bright}bump version${colors.reset} ${colors.dim}v0.1.3${colors.reset}`);
+    console.log(`${colors.dim}target:${colors.reset} ${platform}`);
+    console.log(`\n  ${colors.cyan}1.${colors.reset} major`);
+    console.log(`  ${colors.cyan}2.${colors.reset} minor`);
+    console.log(`  ${colors.cyan}3.${colors.reset} patch`);
+    console.log(`  ${colors.dim}4. exit${colors.reset}`);
+    const answer = await new Promise(resolve => rl.question(`\n${colors.bright}› ${colors.reset}`, resolve));
     rl.close();
     
     switch (answer.trim()) {
       case '1': bumpType = 'major'; break;
       case '2': bumpType = 'minor'; break;
       case '3': bumpType = 'patch'; break;
-      default: console.log('Exiting...'); return;
+      default: return;
     }
   }
 
   try {
     await performBump(platform, bumpType);
   } catch (err) {
-    console.error(`\n${colors.red}❌ Error: ${err.message}${colors.reset}`);
+    console.error(`\n${colors.red}error: ${err.message}${colors.reset}`);
     process.exit(1);
   }
 }
