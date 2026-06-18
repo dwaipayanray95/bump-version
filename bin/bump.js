@@ -257,15 +257,17 @@ async function selectMenu(platform) {
   let firstRender = true;
 
   function render() {
-    const linesToMoveUp = options.length + 4;
+    const linesToMoveUp = options.length + 2;
     if (!firstRender) readline.moveCursor(process.stdout, 0, -linesToMoveUp);
     firstRender = false;
     process.stdout.write('\x1B[?25l');
 
+    readline.cursorTo(process.stdout, 0);
     readline.clearLine(process.stdout, 0);
     process.stdout.write(`${colors.dim}target:${colors.reset} ${platform} ${colors.dim}(${fmt(major, minor, patch)})${colors.reset}\n\n`);
     options.forEach((opt, i) => {
       const isSelected = i === selectedIndex;
+      readline.cursorTo(process.stdout, 0);
       readline.clearLine(process.stdout, 0);
       const prefix = isSelected ? `${colors.cyan}❯${colors.reset} ` : '  ';
       const label = isSelected ? `${colors.bgBlue}${colors.black} ${opt.label} ${colors.reset}` : opt.color + opt.label + colors.reset;
