@@ -270,7 +270,8 @@ async function selectMenu(platform) {
       readline.cursorTo(process.stdout, 0);
       readline.clearLine(process.stdout, 0);
       const prefix = isSelected ? `${colors.cyan}❯${colors.reset} ` : '  ';
-      const label = isSelected ? `${colors.bgBlue}${colors.black} ${opt.label} ${colors.reset}` : opt.color + opt.label + colors.reset;
+      const bgWhite = "\x1b[47m";
+      const label = isSelected ? `${bgWhite}${opt.color} ${opt.label} ${colors.reset}` : opt.color + opt.label + colors.reset;
       const preview = opt.preview ? `  ${colors.dim}${opt.preview}${colors.reset}` : '';
       process.stdout.write(`${prefix}${label}${preview}\n`);
     });
